@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>4-H Pancake Breakfast Tracker</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header id="stats-hold-bar" class="topbar">
+      <h1>4-H Pancake Breakfast Tracker</h1>
+      <div class="topbar-actions">
+        <button id="show-main" class="tab-btn active">Tracker</button>
+        <button id="show-config" class="tab-btn">Config</button>
+        <button id="toggle-fullscreen" class="tab-btn">Fullscreen</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="view-main" class="view active">
+        <p id="status" class="status">Ready. Press buttons to begin a group tally.</p>
+
+        <div id="button-grid" class="button-grid pulse-0">
+          <div class="card blue">
+            <button data-key="adult_ticket" data-delta="1" class="primary">
+              <span class="btn-label">+1 Adult Ticket</span>
+              <span id="batch-ind-adult_ticket" class="btn-indicator">0</span>
+            </button>
+            <div class="sub-row">
+              <button data-key="adult_ticket" data-delta="-1" class="secondary">-1 Adult Ticket</button>
+              <span id="count-adult_ticket" class="count">0</span>
+            </div>
+          </div>
+
+          <div class="card purple">
+            <button data-key="adult_door" data-delta="1" class="primary">
+              <span class="btn-label">+1 Adult @ Door</span>
+              <span id="batch-ind-adult_door" class="btn-indicator">0</span>
+            </button>
+            <div class="sub-row">
+              <button data-key="adult_door" data-delta="-1" class="secondary">-1 Adult @ Door</button>
+              <span id="count-adult_door" class="count">0</span>
+            </div>
+          </div>
+
+          <div class="card green">
+            <button data-key="child_ticket" data-delta="1" class="primary">
+              <span class="btn-label">+1 Child Ticket</span>
+              <span id="batch-ind-child_ticket" class="btn-indicator">0</span>
+            </button>
+            <div class="sub-row">
+              <button data-key="child_ticket" data-delta="-1" class="secondary">-1 Child Ticket</button>
+              <span id="count-child_ticket" class="count">0</span>
+            </div>
+          </div>
+
+          <div class="card orange">
+            <button data-key="child_door" data-delta="1" class="primary">
+              <span class="btn-label">+1 Child @ Door</span>
+              <span id="batch-ind-child_door" class="btn-indicator">0</span>
+            </button>
+            <div class="sub-row">
+              <button data-key="child_door" data-delta="-1" class="secondary">-1 Child @ Door</button>
+              <span id="count-child_door" class="count">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="totals">
+          <div class="totals-left">
+            <div id="total-visitors">Current Batch Visitors: 0</div>
+            <div id="total-visitors-today">Visitors Today: 0</div>
+          </div>
+          <div id="total-sales">Current Batch Sales: $0.00</div>
+          <button id="force-save" class="force-save">Force Save Batch</button>
+        </div>
+      </section>
+
+      <section id="view-config" class="view">
+        <h2>Ticket Prices</h2>
+        <div class="config-grid">
+          <label>Adult Ticket Price <input id="cfg-adult_ticket_price" type="number" min="0" step="0.01" /></label>
+          <label>Adult @ Door Price <input id="cfg-adult_door_price" type="number" min="0" step="0.01" /></label>
+          <label>Child Ticket Price <input id="cfg-child_ticket_price" type="number" min="0" step="0.01" /></label>
+          <label>Child @ Door Price <input id="cfg-child_door_price" type="number" min="0" step="0.01" /></label>
+          <label>Auto Save Delay (seconds) <input id="cfg-batch_idle_seconds" type="number" min="1" max="120" step="1" /></label>
+        </div>
+        <div class="config-actions">
+          <button id="save-config" class="force-save">Save Prices</button>
+          <button id="backup-clear-data" class="danger-action">Backup + Clear Data</button>
+        </div>
+      </section>
+
+      <section id="view-stats" class="view">
+        <h2>Stats</h2>
+        <div class="chart-controls">
+          <label>
+            Data Grouping
+            <select id="stats-grouping">
+              <option value="auto" selected>Auto</option>
+              <option value="raw">Raw (Each Batch)</option>
+              <option value="15m">15 Minute</option>
+              <option value="hour">Hourly</option>
+              <option value="day">Daily</option>
+            </select>
+          </label>
+          <label>
+            Stats File
+            <select id="stats-file-select"></select>
+          </label>
+          <button id="stats-load-file" class="mini-action">Load for Stats</button>
+          <button id="stats-copy-active" class="mini-action mini-action--warn">Copy to Active + Continue</button>
+          <span id="stats-grouping-note" class="chart-grouping-note">Grouping: Auto</span>
+        </div>
+        <div class="stats-groups">
+          <div class="stats-group">
+            <div class="stats-group-title">Revenue</div>
+            <div class="stats-summary-grid stats-summary-grid--3">
+              <div class="stat-card">
+                <div class="stat-title">At Door Revenue</div>
+                <div id="stat-door-revenue" class="stat-value">$0.00</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Ticket Revenue</div>
+                <div id="stat-ticket-revenue" class="stat-value">$0.00</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Overall Revenue</div>
+                <div id="stat-overall-revenue" class="stat-value">$0.00</div>
+              </div>
+            </div>
+          </div>
+          <div class="stats-group">
+            <div class="stats-group-title">Visitor Breakdown</div>
+            <div class="stats-summary-grid">
+              <div class="stat-card stat-card--double-row">
+                <div class="stat-title">Total Visitors</div>
+                <div id="stat-total-visitors" class="stat-value">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Adults (Ticket)</div>
+                <div id="stat-adults-ticket" class="stat-value">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Adults (At Door)</div>
+                <div id="stat-adults-door" class="stat-value">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Adults (Total)</div>
+                <div id="stat-adults-total" class="stat-value">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Kids (Ticket)</div>
+                <div id="stat-kids-ticket" class="stat-value">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Kids (At Door)</div>
+                <div id="stat-kids-door" class="stat-value">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Kids (Total)</div>
+                <div id="stat-kids-total" class="stat-value">0</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-group">
+            <div class="stats-group-title">Flow</div>
+            <div class="stats-summary-grid stats-summary-grid--4">
+              <div class="stat-card">
+                <div class="stat-title">Total Batches</div>
+                <div id="stat-total-batches" class="stat-value">0</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Avg Batch Size</div>
+                <div id="stat-avg-batch" class="stat-value">0.00</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Busiest Hour</div>
+                <div id="stat-busiest-hour" class="stat-value">N/A</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-title">Peak Batch</div>
+                <div id="stat-peak-batch" class="stat-value">N/A</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <h3 class="chart-title">Graph 1: Visitor Traffic Trend</h3>
+        <div class="chart-wrap">
+          <canvas id="visitors-chart"></canvas>
+        </div>
+        <h3 class="chart-title">Graph 2: Visitor Composition (Adult/Kid + Ticket/At Door)</h3>
+        <div class="chart-wrap">
+          <canvas id="sales-chart"></canvas>
+        </div>
+        <h3 class="chart-title">Graph 3: Profit Trend</h3>
+        <div class="chart-wrap">
+          <canvas id="profit-chart"></canvas>
+        </div>
+      </section>
+    </main>
+
+    <script src="../node_modules/chart.js/dist/chart.umd.js"></script>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "customer-tracker",
+  "version": "1.0.0",
+  "description": "4-H Pancake Breakfast visitor and sales tracker",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "^33.2.1"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.7"
+  }
+}
