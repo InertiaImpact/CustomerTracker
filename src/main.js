@@ -2,7 +2,8 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const BASE_DIR = app.getAppPath();
+const LEGACY_BASE_DIR = app.getAppPath();
+const BASE_DIR = process.env.PORTABLE_EXECUTABLE_DIR || app.getPath('userData');
 const CONFIG_PATH = path.join(BASE_DIR, 'config.json');
 const DATA_DIR = path.join(BASE_DIR, 'data');
 const DATA_PATH = path.join(DATA_DIR, 'visits.csv');
@@ -50,6 +51,8 @@ function csvEscape(value) {
 }
 
 function ensureStorage() {
+  migrateLegacyStorageIfNeeded();
+
   if (!fs.existsSync(CONFIG_PATH)) {
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf-8');
   }
@@ -61,6 +64,38 @@ function ensureStorage() {
   if (!fs.existsSync(DATA_PATH)) {
     const headerLine = buildHeaderLine();
     fs.writeFileSync(DATA_PATH, `\uFEFF${headerLine}\r\n`, 'utf-8');
+  }
+}
+
+function migrateLegacyStorageIfNeeded() {
+  if (BASE_DIR === LEGACY_BASE_DIR) {
+    return;
+  }
+
+  const legacyConfigPath = path.join(LEGACY_BASE_DIR, 'config.json');
+  const legacyDataPath = path.join(LEGACY_BASE_DIR, 'data', 'visits.csv');
+
+  const hasLegacyConfig = fs.existsSync(legacyConfigPath);
+  const hasLegacyData = fs.existsSync(legacyDataPath);
+
+  if (!hasLegacyConfig && !hasLegacyData) {
+    return;
+  }
+
+  if (!fs.existsSync(BASE_DIR)) {
+    fs.mkdirSync(BASE_DIR, { recursive: true });
+  }
+
+  if (hasLegacyConfig && !fs.existsSync(CONFIG_PATH)) {
+    fs.copyFileSync(legacyConfigPath, CONFIG_PATH);
+  }
+
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+
+  if (hasLegacyData && !fs.existsSync(DATA_PATH)) {
+    fs.copyFileSync(legacyDataPath, DATA_PATH);
   }
 }
 
@@ -225,6 +260,32 @@ function copyFileToActive(fileName) {
   return { ok: true, activeFile: 'visits.csv' };
 }
 
+function appendFileToActive(fileName) {
+  ensureStorage();
+  const safeName = sanitizeDataFileName(fileName);
+  if (safeName.toLowerCase() === 'visits.csv') {
+    return { ok: true, activeFile: 'visits.csv', appendedRows: 0 };
+  }
+
+  const sourcePath = path.join(DATA_DIR, safeName);
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error('File not found');
+  }
+
+  const sourceRows = readVisitsFromPath(sourcePath);
+  if (sourceRows.length === 0) {
+    return { ok: true, activeFile: 'visits.csv', appendedRows: 0 };
+  }
+
+  const lines = sourceRows.map((row) => {
+    const ordered = CSV_HEADERS.map((header) => csvEscape(row[header] ?? ''));
+    return ordered.join(',');
+  });
+
+  fs.appendFileSync(DATA_PATH, `${lines.join('\r\n')}\r\n`, 'utf-8');
+  return { ok: true, activeFile: 'visits.csv', appendedRows: sourceRows.length };
+}
+
 function createMainWindow() {
   const mainWindow = new BrowserWindow({
     width: 1250,
@@ -272,6 +333,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle('data:copyFileToActive', (_event, fileName) => {
     return copyFileToActive(fileName);
+  });
+
+  ipcMain.handle('data:appendFileToActive', (_event, fileName) => {
+    return appendFileToActive(fileName);
   });
 
   ipcMain.handle('data:backupAndClear', () => {

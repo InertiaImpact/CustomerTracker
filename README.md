@@ -29,6 +29,29 @@ npm install
 npm start
 ```
 
+## Build (Windows)
+Create distributables in the `dist/` folder:
+
+```powershell
+npm run build:win
+```
+
+Build installer only:
+
+```powershell
+npm run build:installer
+```
+
+Build portable `.exe` only:
+
+```powershell
+npm run build:portable
+```
+
+## Where data is saved
+- Installed app: `%APPDATA%\Customer Tracker\`
+- Portable app: next to the portable executable (uses `PORTABLE_EXECUTABLE_DIR`)
+
 ## Data files
 - `config.json` - ticket pricing.
 - `data/visits.csv` - one row per committed group batch with timestamp, counts, prices, visitors, and sales.
