@@ -897,6 +897,11 @@ function wireButtons() {
     saveConfigFromForm();
   });
 
+  document.getElementById('open-save-location').addEventListener('click', async () => {
+    const result = await window.trackerApi.openSaveLocation();
+    statusEl.textContent = `Opened save location: ${result.path}`;
+  });
+
   document.getElementById('backup-clear-data').addEventListener('click', async () => {
     await backupAndClearData();
   });

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -286,6 +286,16 @@ function appendFileToActive(fileName) {
   return { ok: true, activeFile: 'visits.csv', appendedRows: sourceRows.length };
 }
 
+function getSaveLocation() {
+  return BASE_DIR;
+}
+
+function openSaveLocation() {
+  ensureStorage();
+  shell.openPath(BASE_DIR);
+  return { ok: true, path: BASE_DIR };
+}
+
 function createMainWindow() {
   const mainWindow = new BrowserWindow({
     width: 1250,
@@ -341,6 +351,14 @@ app.whenReady().then(() => {
 
   ipcMain.handle('data:backupAndClear', () => {
     return backupAndClearData();
+  });
+
+  ipcMain.handle('data:getSaveLocation', () => {
+    return getSaveLocation();
+  });
+
+  ipcMain.handle('data:openSaveLocation', () => {
+    return openSaveLocation();
   });
 
   ipcMain.handle('window:toggleFullscreen', () => {

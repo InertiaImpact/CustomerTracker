@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('trackerApi', {
   copyFileToActive: (fileName) => ipcRenderer.invoke('data:copyFileToActive', fileName),
   appendFileToActive: (fileName) => ipcRenderer.invoke('data:appendFileToActive', fileName),
   backupAndClearData: () => ipcRenderer.invoke('data:backupAndClear'),
+  getSaveLocation: () => ipcRenderer.invoke('data:getSaveLocation'),
+  openSaveLocation: () => ipcRenderer.invoke('data:openSaveLocation'),
   toggleFullscreen: () => ipcRenderer.invoke('window:toggleFullscreen'),
   getFullscreen: () => ipcRenderer.invoke('window:getFullscreen'),
 });
