@@ -9,9 +9,9 @@ const DATA_DIR = path.join(BASE_DIR, 'data');
 const DATA_PATH = path.join(DATA_DIR, 'visits.csv');
 
 const DEFAULT_CONFIG = {
-  adult_ticket_price: 8.0,
+  adult_ticket_price: 7.0,
   adult_door_price: 10.0,
-  child_ticket_price: 5.0,
+  child_ticket_price: 7.0,
   child_door_price: 6.0,
   batch_idle_seconds: 5,
 };

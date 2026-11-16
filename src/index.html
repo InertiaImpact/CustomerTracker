@@ -23,44 +23,44 @@
         <div id="button-grid" class="button-grid pulse-0">
           <div class="card blue">
             <button data-key="adult_ticket" data-delta="1" class="primary">
-              <span class="btn-label">+1 Adult Ticket</span>
+              <span class="btn-label">+1 Adult<br />Pre-Purchased Ticket</span>
               <span id="batch-ind-adult_ticket" class="btn-indicator">0</span>
             </button>
             <div class="sub-row">
-              <button data-key="adult_ticket" data-delta="-1" class="secondary">-1 Adult Ticket</button>
+              <button data-key="adult_ticket" data-delta="-1" class="secondary">-1 Adult<br />Pre-Purchased Ticket</button>
               <span id="count-adult_ticket" class="count">0</span>
             </div>
           </div>
 
           <div class="card purple">
             <button data-key="adult_door" data-delta="1" class="primary">
-              <span class="btn-label">+1 Adult @ Door</span>
+              <span class="btn-label">+1 Adult<br />Paid at the Door</span>
               <span id="batch-ind-adult_door" class="btn-indicator">0</span>
             </button>
             <div class="sub-row">
-              <button data-key="adult_door" data-delta="-1" class="secondary">-1 Adult @ Door</button>
+              <button data-key="adult_door" data-delta="-1" class="secondary">-1 Adult<br />Paid at the Door</button>
               <span id="count-adult_door" class="count">0</span>
             </div>
           </div>
 
           <div class="card green">
             <button data-key="child_ticket" data-delta="1" class="primary">
-              <span class="btn-label">+1 Child Ticket</span>
+              <span class="btn-label">+1 Child<br />Pre-Purchased Ticket</span>
               <span id="batch-ind-child_ticket" class="btn-indicator">0</span>
             </button>
             <div class="sub-row">
-              <button data-key="child_ticket" data-delta="-1" class="secondary">-1 Child Ticket</button>
+              <button data-key="child_ticket" data-delta="-1" class="secondary">-1 Child<br />Pre-Purchased Ticket</button>
               <span id="count-child_ticket" class="count">0</span>
             </div>
           </div>
 
           <div class="card orange">
             <button data-key="child_door" data-delta="1" class="primary">
-              <span class="btn-label">+1 Child @ Door</span>
+              <span class="btn-label">+1 Child<br />Paid at the Door</span>
               <span id="batch-ind-child_door" class="btn-indicator">0</span>
             </button>
             <div class="sub-row">
-              <button data-key="child_door" data-delta="-1" class="secondary">-1 Child @ Door</button>
+              <button data-key="child_door" data-delta="-1" class="secondary">-1 Child<br />Paid at the Door</button>
               <span id="count-child_door" class="count">0</span>
             </div>
           </div>
@@ -100,15 +100,21 @@
             <select id="stats-grouping">
               <option value="auto" selected>Auto</option>
               <option value="raw">Raw (Each Batch)</option>
+              <option value="minute">Minute Bucket</option>
               <option value="15m">15 Minute</option>
               <option value="hour">Hourly</option>
               <option value="day">Daily</option>
             </select>
           </label>
           <label>
+            Group Minutes
+            <input id="stats-minute-group" type="number" min="1" max="120" step="1" value="5" />
+          </label>
+          <label>
             Stats File
             <select id="stats-file-select"></select>
           </label>
+          <button id="stats-refresh" class="mini-action">Refresh Stats</button>
           <button id="stats-load-file" class="mini-action">Load for Stats</button>
           <button id="stats-overwrite-active" class="mini-action mini-action--warn">Overwrite Active + Continue</button>
           <button id="stats-append-active" class="mini-action mini-action--warn">Append to Active + Continue</button>

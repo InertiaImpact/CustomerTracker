@@ -157,8 +157,8 @@ main {
   position: absolute;
   top: 0.18em;
   right: 0.18em;
-  min-width: 2.4em;
-  height: 2.4em;
+  min-width: 2.2em;
+  height: 2.2em;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
   color: #111827;
@@ -168,7 +168,7 @@ main {
   font-size: 1.2em;
   line-height: 1;
   font-weight: 800;
-  padding: 0 0.35em;
+  padding: 0 0.3em;
 }
 
 .blue .primary { background: var(--blue); }
@@ -307,6 +307,15 @@ h2 {
   border-radius: 8px;
   border: 1px solid #c6d5e6;
   background: #fff;
+}
+
+.chart-controls input {
+  font-size: clamp(13px, 0.95vw, 16px);
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid #c6d5e6;
+  background: #fff;
+  width: 88px;
 }
 
 .mini-action {

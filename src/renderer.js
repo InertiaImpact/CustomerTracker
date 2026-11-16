@@ -1,7 +1,7 @@
 let config = {
-  adult_ticket_price: 8,
+  adult_ticket_price: 7,
   adult_door_price: 10,
-  child_ticket_price: 5,
+  child_ticket_price: 7,
   child_door_price: 6,
   batch_idle_seconds: 5,
 };
@@ -33,12 +33,16 @@ const totalVisitorsTodayEl = document.getElementById('total-visitors-today');
 const totalSalesEl = document.getElementById('total-sales');
 
 const statsGroupingEl = document.getElementById('stats-grouping');
+const statsMinuteGroupEl = document.getElementById('stats-minute-group');
 const statsGroupingNoteEl = document.getElementById('stats-grouping-note');
 const statsFileSelectEl = document.getElementById('stats-file-select');
+const statsRefreshBtnEl = document.getElementById('stats-refresh');
 const statsLoadFileBtnEl = document.getElementById('stats-load-file');
 const statsOverwriteActiveBtnEl = document.getElementById('stats-overwrite-active');
 const statsAppendActiveBtnEl = document.getElementById('stats-append-active');
 const statsResetActiveBtnEl = document.getElementById('stats-reset-active');
+
+const STATS_GROUPING_PREFS_KEY = 'tracker.stats.groupingPrefs';
 
 function totalVisitors() {
   return batch.adult_ticket + batch.adult_door + batch.child_ticket + batch.child_door;
@@ -309,7 +313,7 @@ function pad2(value) {
   return String(value).padStart(2, '0');
 }
 
-function floorToBucket(date, mode) {
+function floorToBucket(date, mode, minuteBucket = 5) {
   const copy = new Date(date.getTime());
 
   if (mode === 'day') {
@@ -328,10 +332,17 @@ function floorToBucket(date, mode) {
     return copy;
   }
 
+  if (mode === 'minute') {
+    const bucket = Math.max(1, Math.min(120, Math.round(Number(minuteBucket) || 5)));
+    const minutes = copy.getMinutes();
+    copy.setMinutes(Math.floor(minutes / bucket) * bucket, 0, 0);
+    return copy;
+  }
+
   return copy;
 }
 
-function formatBucketLabel(date, mode) {
+function formatBucketLabel(date, mode, minuteBucket = 5) {
   const year = date.getFullYear();
   const month = pad2(date.getMonth() + 1);
   const day = pad2(date.getDate());
@@ -346,11 +357,103 @@ function formatBucketLabel(date, mode) {
     return `${year}-${month}-${day} ${hour}:00`;
   }
 
-  if (mode === '15m') {
+  if (mode === '15m' || mode === 'minute') {
     return `${year}-${month}-${day} ${hour}:${minute}`;
   }
 
   return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
+function formatAxisTimestamp(value, mode, minuteBucket = 5) {
+  const ms = Number(value);
+  if (!Number.isFinite(ms)) {
+    return '';
+  }
+
+  const date = new Date(ms);
+  const year = date.getFullYear();
+  const month = pad2(date.getMonth() + 1);
+  const day = pad2(date.getDate());
+  const hour = pad2(date.getHours());
+  const minute = pad2(date.getMinutes());
+
+  if (mode === 'day') {
+    return `${year}-${month}-${day}`;
+  }
+
+  if (mode === 'hour') {
+    return `${month}/${day} ${hour}:00`;
+  }
+
+  if (mode === '15m') {
+    return `${month}/${day} ${hour}:${minute}`;
+  }
+
+  if (mode === 'minute') {
+    return `${month}/${day} ${hour}:${minute}`;
+  }
+
+  return `${month}/${day} ${hour}:${minute}`;
+}
+
+function getMinuteGroupingValue() {
+  const raw = Number(statsMinuteGroupEl?.value);
+  const sane = Number.isFinite(raw) ? raw : 5;
+  const rounded = Math.round(sane);
+  const clamped = Math.max(1, Math.min(120, rounded));
+  if (statsMinuteGroupEl) {
+    statsMinuteGroupEl.value = String(clamped);
+  }
+  return clamped;
+}
+
+function saveStatsGroupingPreferences() {
+  if (!statsGroupingEl) {
+    return;
+  }
+
+  const prefs = {
+    grouping: statsGroupingEl.value || 'auto',
+    minuteBucket: getMinuteGroupingValue(),
+  };
+
+  try {
+    window.localStorage.setItem(STATS_GROUPING_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+  }
+}
+
+function loadStatsGroupingPreferences() {
+  if (!statsGroupingEl) {
+    return;
+  }
+
+  let grouping = 'auto';
+  let minuteBucket = 5;
+
+  try {
+    const raw = window.localStorage.getItem(STATS_GROUPING_PREFS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.grouping === 'string' && parsed.grouping.length > 0) {
+        grouping = parsed.grouping;
+      }
+      if (Number.isFinite(Number(parsed.minuteBucket))) {
+        minuteBucket = Number(parsed.minuteBucket);
+      }
+    }
+  } catch {
+  }
+
+  const validGroupings = ['auto', 'raw', 'minute', '15m', 'hour', 'day'];
+  if (!validGroupings.includes(grouping)) {
+    grouping = 'auto';
+  }
+
+  statsGroupingEl.value = grouping;
+  if (statsMinuteGroupEl) {
+    statsMinuteGroupEl.value = String(Math.max(1, Math.min(120, Math.round(minuteBucket || 5))));
+  }
 }
 
 function pickAutoGrouping(rowCount) {
@@ -382,12 +485,23 @@ function getRevenueParts(row) {
   };
 }
 
-function aggregateRows(rows, mode) {
+function aggregateRows(rows, mode, minuteBucket = 5) {
   if (mode === 'raw') {
-    return rows.map((row) => ({
-      ...row,
-      ...getRevenueParts(row),
-    }));
+    return rows
+      .map((row) => {
+        const date = parseLocalTimestamp(row.timestamp);
+        if (!date) {
+          return null;
+        }
+
+        return {
+          ...row,
+          ...getRevenueParts(row),
+          _timeMs: date.getTime(),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a._timeMs - b._timeMs);
   }
 
   const buckets = new Map();
@@ -398,12 +512,13 @@ function aggregateRows(rows, mode) {
       return;
     }
 
-    const bucketDate = floorToBucket(date, mode);
+    const bucketDate = floorToBucket(date, mode, minuteBucket);
     const key = bucketDate.getTime();
     if (!buckets.has(key)) {
       buckets.set(key, {
         _date: bucketDate,
-        timestamp: formatBucketLabel(bucketDate, mode),
+        _timeMs: key,
+        timestamp: formatBucketLabel(bucketDate, mode, minuteBucket),
         adult_ticket_count: 0,
         adult_door_count: 0,
         child_ticket_count: 0,
@@ -641,33 +756,42 @@ async function refreshStats() {
   const rows = await readStatsRowsFromSelectedSource();
   updateStatsSummary(rows);
 
+  const minuteBucket = getMinuteGroupingValue();
   const groupingSelection = statsGroupingEl?.value || 'auto';
   const appliedGrouping = groupingSelection === 'auto'
     ? pickAutoGrouping(rows.length)
     : groupingSelection;
-  const chartRows = aggregateRows(rows, appliedGrouping);
+  const chartRows = aggregateRows(rows, appliedGrouping, minuteBucket);
+  const chartRowsWithTime = chartRows
+    .filter((row) => Number.isFinite(Number(row._timeMs)))
+    .sort((a, b) => Number(a._timeMs) - Number(b._timeMs));
 
   if (statsGroupingNoteEl) {
     const groupingLabel = appliedGrouping === 'raw'
       ? 'Raw (Each Batch)'
+      : appliedGrouping === 'minute'
+        ? `${minuteBucket} Minute`
       : appliedGrouping === '15m'
         ? '15 Minute'
         : appliedGrouping === 'hour'
           ? 'Hourly'
           : 'Daily';
     const sourceLabel = statsSourceFile === 'visits.csv' ? 'Source: Active' : `Source: ${statsSourceFile}`;
-    statsGroupingNoteEl.textContent = `Grouping: ${groupingLabel} · Points: ${chartRows.length} · ${sourceLabel}`;
+    statsGroupingNoteEl.textContent = `Grouping: ${groupingLabel} · Points: ${chartRowsWithTime.length} · ${sourceLabel}`;
   }
 
-  const labels = chartRows.map((row) => row.timestamp);
-  const visitorsPerBatch = chartRows.map((row) => Number(row.total_visitors || 0));
-  const adultTicketPerBatch = chartRows.map((row) => Number(row.adult_ticket_count || 0));
-  const adultDoorPerBatch = chartRows.map((row) => Number(row.adult_door_count || 0));
-  const childTicketPerBatch = chartRows.map((row) => Number(row.child_ticket_count || 0));
-  const childDoorPerBatch = chartRows.map((row) => Number(row.child_door_count || 0));
-  const adultsPerBatch = chartRows.map((row) => Number(row.adult_ticket_count || 0) + Number(row.adult_door_count || 0));
-  const kidsPerBatch = chartRows.map((row) => Number(row.child_ticket_count || 0) + Number(row.child_door_count || 0));
-  const profitPerBatch = chartRows.map((row) => Number(row.ticket_revenue || 0) + Number(row.door_revenue || 0));
+  const timeMs = chartRowsWithTime.map((row) => Number(row._timeMs));
+  const visitorsPerBatch = chartRowsWithTime.map((row) => Number(row.total_visitors || 0));
+  const adultTicketPerBatch = chartRowsWithTime.map((row) => Number(row.adult_ticket_count || 0));
+  const adultDoorPerBatch = chartRowsWithTime.map((row) => Number(row.adult_door_count || 0));
+  const childTicketPerBatch = chartRowsWithTime.map((row) => Number(row.child_ticket_count || 0));
+  const childDoorPerBatch = chartRowsWithTime.map((row) => Number(row.child_door_count || 0));
+  const adultsPerBatch = chartRowsWithTime.map((row) => Number(row.adult_ticket_count || 0) + Number(row.adult_door_count || 0));
+  const kidsPerBatch = chartRowsWithTime.map((row) => Number(row.child_ticket_count || 0) + Number(row.child_door_count || 0));
+  const profitPerBatch = chartRowsWithTime.map((row) => Number(row.ticket_revenue || 0) + Number(row.door_revenue || 0));
+
+  const xMin = timeMs.length > 0 ? timeMs[0] : undefined;
+  const xMax = timeMs.length > 0 ? timeMs[timeMs.length - 1] : undefined;
 
   const cumulativeVisitors = [];
   const cumulativeProfit = [];
@@ -689,13 +813,14 @@ async function refreshStats() {
   visitorsChart = new Chart(document.getElementById('visitors-chart'), {
     type: 'line',
     data: {
-      labels,
       datasets: [
         {
           type: 'bar',
           label: 'Adults per Batch',
-          data: adultsPerBatch,
+          data: adultsPerBatch.map((y, idx) => ({ x: timeMs[idx], y })),
           stack: 'visitors',
+          barThickness: 10,
+          maxBarThickness: 14,
           borderColor: '#2e86de',
           backgroundColor: 'rgba(46,134,222,0.6)',
           borderWidth: 1,
@@ -703,21 +828,23 @@ async function refreshStats() {
         {
           type: 'bar',
           label: 'Kids per Batch',
-          data: kidsPerBatch,
+          data: kidsPerBatch.map((y, idx) => ({ x: timeMs[idx], y })),
           stack: 'visitors',
+          barThickness: 10,
+          maxBarThickness: 14,
           borderColor: '#27ae60',
           backgroundColor: 'rgba(39,174,96,0.6)',
           borderWidth: 1,
         },
         {
           label: 'Batch Total Visitors',
-          data: visitorsPerBatch,
+          data: visitorsPerBatch.map((y, idx) => ({ x: timeMs[idx], y })),
           borderColor: '#7f8c8d',
           tension: 0.2,
         },
         {
           label: 'Cumulative Visitors',
-          data: cumulativeVisitors,
+          data: cumulativeVisitors.map((y, idx) => ({ x: timeMs[idx], y })),
           borderColor: '#1c2430',
           borderDash: [6, 4],
           tension: 0.2,
@@ -732,7 +859,16 @@ async function refreshStats() {
       },
       scales: {
         y: { beginAtZero: true, stacked: true },
-        x: { ticks: { autoSkip: true, maxTicksLimit: 8 } },
+        x: {
+          type: 'linear',
+          min: xMin,
+          max: xMax,
+          ticks: {
+            autoSkip: true,
+            maxTicksLimit: 8,
+            callback: (value) => formatAxisTimestamp(value, appliedGrouping, minuteBucket),
+          },
+        },
       },
     },
   });
@@ -740,11 +876,12 @@ async function refreshStats() {
   salesChart = new Chart(document.getElementById('sales-chart'), {
     type: 'bar',
     data: {
-      labels,
       datasets: [
         {
           label: 'Adult Ticket',
-          data: adultTicketPerBatch,
+          data: adultTicketPerBatch.map((y, idx) => ({ x: timeMs[idx], y })),
+          barThickness: 10,
+          maxBarThickness: 14,
           borderColor: '#2e86de',
           backgroundColor: 'rgba(46,134,222,0.60)',
           borderWidth: 1,
@@ -752,7 +889,9 @@ async function refreshStats() {
         },
         {
           label: 'Adult @ Door',
-          data: adultDoorPerBatch,
+          data: adultDoorPerBatch.map((y, idx) => ({ x: timeMs[idx], y })),
+          barThickness: 10,
+          maxBarThickness: 14,
           borderColor: '#8e44ad',
           backgroundColor: 'rgba(142,68,173,0.60)',
           borderWidth: 1,
@@ -760,7 +899,9 @@ async function refreshStats() {
         },
         {
           label: 'Child Ticket',
-          data: childTicketPerBatch,
+          data: childTicketPerBatch.map((y, idx) => ({ x: timeMs[idx], y })),
+          barThickness: 10,
+          maxBarThickness: 14,
           borderColor: '#27ae60',
           backgroundColor: 'rgba(39,174,96,0.60)',
           borderWidth: 1,
@@ -768,7 +909,9 @@ async function refreshStats() {
         },
         {
           label: 'Child @ Door',
-          data: childDoorPerBatch,
+          data: childDoorPerBatch.map((y, idx) => ({ x: timeMs[idx], y })),
+          barThickness: 10,
+          maxBarThickness: 14,
           borderColor: '#e67e22',
           backgroundColor: 'rgba(230,126,34,0.60)',
           borderWidth: 1,
@@ -784,7 +927,16 @@ async function refreshStats() {
       },
       scales: {
         y: { beginAtZero: true, stacked: true },
-        x: { ticks: { autoSkip: true, maxTicksLimit: 8 } },
+        x: {
+          type: 'linear',
+          min: xMin,
+          max: xMax,
+          ticks: {
+            autoSkip: true,
+            maxTicksLimit: 8,
+            callback: (value) => formatAxisTimestamp(value, appliedGrouping, minuteBucket),
+          },
+        },
       },
     },
   });
@@ -792,19 +944,20 @@ async function refreshStats() {
   profitChart = new Chart(document.getElementById('profit-chart'), {
     type: 'line',
     data: {
-      labels,
       datasets: [
         {
           type: 'bar',
           label: 'Batch Profit',
-          data: profitPerBatch,
+          data: profitPerBatch.map((y, idx) => ({ x: timeMs[idx], y })),
+          barThickness: 10,
+          maxBarThickness: 14,
           borderColor: '#7d3c98',
           backgroundColor: 'rgba(125,60,152,0.45)',
           borderWidth: 1,
         },
         {
           label: 'Cumulative Profit',
-          data: cumulativeProfit,
+          data: cumulativeProfit.map((y, idx) => ({ x: timeMs[idx], y })),
           borderColor: '#1c2430',
           borderDash: [6, 4],
           tension: 0.2,
@@ -819,7 +972,16 @@ async function refreshStats() {
       },
       scales: {
         y: { beginAtZero: true },
-        x: { ticks: { autoSkip: true, maxTicksLimit: 8 } },
+        x: {
+          type: 'linear',
+          min: xMin,
+          max: xMax,
+          ticks: {
+            autoSkip: true,
+            maxTicksLimit: 8,
+            callback: (value) => formatAxisTimestamp(value, appliedGrouping, minuteBucket),
+          },
+        },
       },
     },
   });
@@ -926,9 +1088,29 @@ function wireButtons() {
 
   if (statsGroupingEl) {
     statsGroupingEl.addEventListener('change', async () => {
+      saveStatsGroupingPreferences();
       if (document.getElementById('view-stats')?.classList.contains('active')) {
         await refreshStats();
       }
+    });
+  }
+
+  if (statsMinuteGroupEl) {
+    statsMinuteGroupEl.addEventListener('change', async () => {
+      getMinuteGroupingValue();
+      saveStatsGroupingPreferences();
+      if (document.getElementById('view-stats')?.classList.contains('active')) {
+        await refreshStats();
+      }
+    });
+  }
+
+  if (statsRefreshBtnEl) {
+    statsRefreshBtnEl.addEventListener('click', async () => {
+      getMinuteGroupingValue();
+      saveStatsGroupingPreferences();
+      await refreshStats();
+      statusEl.textContent = 'Stats grouping saved and refreshed.';
     });
   }
 
@@ -959,6 +1141,7 @@ function wireButtons() {
 
 async function init() {
   config = await window.trackerApi.getConfig();
+  loadStatsGroupingPreferences();
   const isFullscreen = await window.trackerApi.getFullscreen();
   document.getElementById('toggle-fullscreen').textContent = isFullscreen ? 'Exit Fullscreen' : 'Fullscreen';
 
